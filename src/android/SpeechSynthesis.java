@@ -217,7 +217,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                 try {
                     voice.put("voiceURI", v.getName());
                     voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
-                    // voice.put("features", v.getFeatures());
+                     voice.put("features", v.getFeatures());
                     // voice.put("displayName", locale.getDisplayLanguage(locale) + " " +
                     // locale.getDisplayCountry(locale));
                     voice.put("lang", locale.getLanguage() + "-" + locale.getCountry());
