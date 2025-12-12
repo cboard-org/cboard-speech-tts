@@ -5,30 +5,41 @@ const SpeechSynthesisEngine = require("./SpeechSynthesisEngine");
 var SpeechSynthesisVoiceList = require("./SpeechSynthesisVoiceList");
 
 var SpeechSynthesis = function () {
-	this.pending = false;
-	this.speaking = false;
-	this.paused = false;
-	this._voices = null;
-	this._defaultEngine = null;
-	this._engines = null;
-	var that = this;
-	var successCallback = function (data) {
-		that._voices = new SpeechSynthesisVoiceList(data);
+    this.pending = false;
+    this.speaking = false;
+    this.paused = false;
+    this._voices = null;
+    this._defaultEngine = null;
+    this._engines = null;
+    this.onvoiceschanged = null;
+    this._voicesChangedListeners = [];
+    var that = this;
+    var successCallback = function (data) {
+        try {
+            that._voices = new SpeechSynthesisVoiceList(data);
 
-		// get all engines 
-		var successEnginesCallback = function (enginesData) {
-			that._engines = new SpeechSynthesisEngineList(enginesData);
-		};
-		exec(successEnginesCallback, null, "SpeechSynthesis", "getEngines", []);
+            setTimeout(function () {
+                that._fireVoicesChangedEvent();
+            }, 0); // Async to allow proper initialization
+        } catch (error) {
+            console.error("Error initializing voices:", error);
+            that._voices = new SpeechSynthesisVoiceList([]);
+        }
 
-		// get the default engine 
-		var successDefaultEngineCallback = function (engineData) {
-			that._defaultEngine = new SpeechSynthesisEngine(engineData);
-		};
+        // get all engines
+        var successEnginesCallback = function (enginesData) {
+            that._engines = new SpeechSynthesisEngineList(enginesData);
+        };
+        exec(successEnginesCallback, null, "SpeechSynthesis", "getEngines", []);
+
+        // get the default engine
+        var successDefaultEngineCallback = function (engineData) {
+            that._defaultEngine = new SpeechSynthesisEngine(engineData);
+        };
 		exec(successDefaultEngineCallback, null, "SpeechSynthesis", "getDefaultEngine", []);
-	};
+    };
 
-	exec(successCallback, null, "SpeechSynthesis", "startup", []);
+    exec(successCallback, null, "SpeechSynthesis", "startup", []);
 };
 
 SpeechSynthesis.prototype.speak = function (utterance) {
@@ -77,16 +88,49 @@ SpeechSynthesis.prototype.getDefaultEngine = function () {
 };
 
 SpeechSynthesis.prototype.getVoices = function () {
-	return this._voices;
+	return this._voices || new SpeechSynthesisVoiceList([]);
 };
 
 SpeechSynthesis.prototype.setEngine = function (engineName, onReady) {
-	var that = this;
-	var setEngineSuccessCallback = function (data) {
-		that._voices = new SpeechSynthesisVoiceList(data);
-		onReady(data);
-	}
-	exec(setEngineSuccessCallback, null, "SpeechSynthesis", "setEngine", [engineName]);
+    var that = this;
+    var setEngineSuccessCallback = function (data) {
+        that._voices = new SpeechSynthesisVoiceList(data);
+        that._fireVoicesChangedEvent();
+
+        if (typeof onReady === "function") {
+            onReady(data);
+        }
+    };
+    exec(setEngineSuccessCallback, null, "SpeechSynthesis", "setEngine", [engineName]);
+};
+
+SpeechSynthesis.prototype.addEventListener = function (type, listener) {
+    if (type === "voiceschanged" && typeof listener === "function") {
+        this._voicesChangedListeners.push(listener);
+    }
+};
+
+SpeechSynthesis.prototype.removeEventListener = function (type, listener) {
+    if (type === "voiceschanged") {
+        var index = this._voicesChangedListeners.indexOf(listener);
+        if (index > -1) {
+            this._voicesChangedListeners.splice(index, 1);
+        }
+    }
+};
+
+SpeechSynthesis.prototype._fireVoicesChangedEvent = function () {
+    if (typeof this.onvoiceschanged === "function") {
+        this.onvoiceschanged();
+    }
+
+    this._voicesChangedListeners.forEach(function (listener) {
+        try {
+            listener();
+        } catch (e) {
+            console.error("Error in voiceschanged listener:", e);
+        }
+    });
 };
 
 module.exports = new SpeechSynthesis();
