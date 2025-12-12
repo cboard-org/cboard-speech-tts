@@ -1,6 +1,10 @@
 
 var SpeechSynthesisVoiceList = function(data) {
-  this._list = data;
+  if (!data || !Array.isArray(data)) {
+    this._list = [];
+  } else {
+    this._list = data;
+  }
   this.length = this._list.length;
 };
     
