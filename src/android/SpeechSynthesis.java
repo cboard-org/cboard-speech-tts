@@ -60,7 +60,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                         voiceCode = voice.optString("voiceURI", null);
                     }
                 }
-                if (voiceCode != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                if (voiceCode != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && this.voiceList != null) {
                     for (Voice v : this.voiceList) {
                         if (voiceCode.equals(v.getName())) {
                             mTts.setVoice(v);
@@ -211,6 +211,8 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             this.voiceList = mTts.getVoices();
+            if (this.voiceList != null) {
+                Log.d(LOG_TAG, "Found " + this.voiceList.size() + " voices from TTS engine");
             for (Voice v : this.voiceList) {
                 Locale locale = v.getLocale();
                 voice = new JSONObject();
@@ -228,6 +230,9 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                     // should never happen
                 }
                 voices.put(voice);
+                }
+            } else {
+                Log.w(LOG_TAG, "No voices available from TTS engine - getVoices() returned null");
             }
         } else {
             // Iterator<Locale> list = voiceList.iterator();
