@@ -133,7 +133,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                     state = SpeechSynthesis.INITIALIZING;
                     mTts = new TextToSpeech(cordova.getActivity().getApplicationContext(), this);
                 } else {
-                    getVoices(callbackContext);
+                    getVoices(this.startupCallbackContext);
                 }
                 PluginResult pluginResult = new PluginResult(status, SpeechSynthesis.INITIALIZING);
                 pluginResult.setKeepCallback(true);
@@ -141,6 +141,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
             } else if (action.equals("setEngine")) {
                 this.startupCallbackContext = callbackContext;
                 String engineName = args.getString(0);
+                Log.d(LOG_TAG, "Setting TTS engine to: " + engineName + " - waiting for full initialization");
                 state = SpeechSynthesis.INITIALIZING;
                 if (mTts != null) {
                     mTts.shutdown();
@@ -209,27 +210,29 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
         JSONArray voices = new JSONArray();
         JSONObject voice;
 
+        Log.d(LOG_TAG, "getVoices called, building voice list...");
+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             this.voiceList = mTts.getVoices();
             if (this.voiceList != null) {
                 Log.d(LOG_TAG, "Found " + this.voiceList.size() + " voices from TTS engine");
-            for (Voice v : this.voiceList) {
-                Locale locale = v.getLocale();
-                voice = new JSONObject();
-                try {
-                    voice.put("voiceURI", v.getName());
-                    voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
-                     voice.put("features", v.getFeatures());
-                    // voice.put("displayName", locale.getDisplayLanguage(locale) + " " +
-                    // locale.getDisplayCountry(locale));
-                    voice.put("lang", locale.getLanguage() + "-" + locale.getCountry());
-                    voice.put("localService", !v.isNetworkConnectionRequired());
-                    voice.put("quality", v.getQuality());
-                    voice.put("default", false);
-                } catch (JSONException e) {
-                    // should never happen
-                }
-                voices.put(voice);
+                for (Voice v : this.voiceList) {
+                    Locale locale = v.getLocale();
+                    voice = new JSONObject();
+                    try {
+                        voice.put("voiceURI", v.getName());
+                        voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
+                         voice.put("features", v.getFeatures());
+                        // voice.put("displayName", locale.getDisplayLanguage(locale) + " " +
+                        // locale.getDisplayCountry(locale));
+                        voice.put("lang", locale.getLanguage() + "-" + locale.getCountry());
+                        voice.put("localService", !v.isNetworkConnectionRequired());
+                        voice.put("quality", v.getQuality());
+                        voice.put("default", false);
+                    } catch (JSONException e) {
+                        // should never happen
+                    }
+                    voices.put(voice);
                 }
             } else {
                 Log.w(LOG_TAG, "No voices available from TTS engine - getVoices() returned null");
@@ -257,6 +260,8 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                 }
             }
         }
+        
+        Log.d(LOG_TAG, "Sending " + voices.length() + " voices to JavaScript");
         PluginResult result = new PluginResult(PluginResult.Status.OK, voices);
         result.setKeepCallback(false);
         startupCallbackContext.sendPluginResult(result);
