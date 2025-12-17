@@ -3,6 +3,7 @@ var exec = require("cordova/exec");
 const SpeechSynthesisEngineList = require("./SpeechSynthesisEngineList");
 const SpeechSynthesisEngine = require("./SpeechSynthesisEngine");
 var SpeechSynthesisVoiceList = require("./SpeechSynthesisVoiceList");
+const INITIALIZING = 1;
 
 var SpeechSynthesis = function () {
     this.pending = false;
@@ -15,28 +16,28 @@ var SpeechSynthesis = function () {
     this._voicesChangedListeners = [];
     var that = this;
     var successCallback = function (data) {
-        try {
-            that._voices = new SpeechSynthesisVoiceList(data);
+        if (data === INITIALIZING) {
+            console.log("TTS startup initializing...");
+            var successEnginesCallback = function (enginesData) {
+                that._engines = new SpeechSynthesisEngineList(enginesData);
+            };
+            exec(successEnginesCallback, null, "SpeechSynthesis", "getEngines", []);
 
-            setTimeout(function () {
-                that._fireVoicesChangedEvent();
-            }, 0); // Async to allow proper initialization
-        } catch (error) {
-            console.error("Error initializing voices:", error);
-            that._voices = new SpeechSynthesisVoiceList([]);
+            var successDefaultEngineCallback = function (engineData) {
+                that._defaultEngine = new SpeechSynthesisEngine(engineData);
+            };
+            exec(successDefaultEngineCallback, null, "SpeechSynthesis", "getDefaultEngine", []);
+            return;
         }
 
-        // get all engines
-        var successEnginesCallback = function (enginesData) {
-            that._engines = new SpeechSynthesisEngineList(enginesData);
-        };
-        exec(successEnginesCallback, null, "SpeechSynthesis", "getEngines", []);
+        if (Array.isArray(data)) {
+            console.log("TTS startup completed with " + data.length + " voices");
+            that._voices = new SpeechSynthesisVoiceList(data);
+            that._fireVoicesChangedEvent();
+            return;
+        }
 
-        // get the default engine
-        var successDefaultEngineCallback = function (engineData) {
-            that._defaultEngine = new SpeechSynthesisEngine(engineData);
-        };
-		exec(successDefaultEngineCallback, null, "SpeechSynthesis", "getDefaultEngine", []);
+        console.log("Unexpected response from native startup:", data);
     };
 
     exec(successCallback, null, "SpeechSynthesis", "startup", []);
@@ -94,13 +95,23 @@ SpeechSynthesis.prototype.getVoices = function () {
 SpeechSynthesis.prototype.setEngine = function (engineName, onReady) {
     var that = this;
     var setEngineSuccessCallback = function (data) {
-        that._voices = new SpeechSynthesisVoiceList(data);
-        that._fireVoicesChangedEvent();
-
-        if (typeof onReady === "function") {
-            onReady(data);
+        if (data === INITIALIZING) {
+            console.log("TTS engine initializing...");
+            return;
         }
+        if (Array.isArray(data)) {
+            console.log("SetEngine completed with " + data.length + " voices");
+            that._voices = new SpeechSynthesisVoiceList(data);
+            that._fireVoicesChangedEvent();
+
+            if (typeof onReady === "function") {
+                onReady(data);
+            }
+            return;
+        }
+        console.log("Unexpected response from native setEngine:", data);
     };
+
     exec(setEngineSuccessCallback, null, "SpeechSynthesis", "setEngine", [engineName]);
 };
 
